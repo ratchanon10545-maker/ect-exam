@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ระบบตรวจคำตอบหลายชุด</title>
+<style>
+body { font-family: Arial; padding:20px; background:#f4f6f9; }
+.question { background:white; padding:15px; margin-bottom:15px; border-radius:8px; }
+.correct { color:green; font-weight:bold; }
+.wrong { color:red; font-weight:bold; }
+button { padding:8px 15px; margin-top:10px; cursor:pointer; }
+select { padding:6px; }
+</style>
+</head>
+<body>
+
+<h2>เลือกชุดข้อสอบ</h2>
+
+<select id="examSelect">
+  <option value="">-- เลือกข้อสอบ --</option>
+  <option value="set1">ชุดที่ 1 พรป.ว่าด้วยคณะกกต</option>
+  <option value="set2">ชุดที่ 2 พรป.ว่าด้วยพรรคการเมือง พ.ศ.2560</option>
+</select>
+
+<button onclick="loadExam()">เริ่มทำข้อสอบ</button>
+
+<hr>
+
+<div id="quiz"></div>
+<button onclick="checkAnswers()" id="checkBtn" style="display:none;">ตรวจคำตอบ</button>
+<h3 id="result"></h3>
+
+<script>
+
+let answerKey = {};
+
+async function loadExam() {
+  const exam = document.getElementById("examSelect").value;
+  if (!exam) return alert("กรุณาเลือกชุดข้อสอบ");
+
+  document.getElementById("quiz").innerHTML = "";
+  document.getElementById("result").innerHTML = "";
+
+  // โหลดคำถาม
+  const qRes = await fetch(`data/${exam}.txt`);
+  const text = await qRes.text();
+
+  // โหลดเฉลย
+  const aRes = await fetch(`data/${exam}_answers.json`);
+  answerKey = await aRes.json();
+
+  const quizDiv = document.getElementById("quiz");
+
+  const questionBlocks = text.split(/\n(?=\d+\.)/);
+
+  questionBlocks.forEach(block => {
+    const lines = block.trim().split("\n");
+    if (!lines[0]) return;
+
+    const questionText = lines[0];
+    const qNumber = questionText.match(/^(\d+)/)[1];
+
+    const div = document.createElement("div");
+    div.className = "question";
+
+    let html = `<p>${questionText}</p>`;
+
+    for (let i = 1; i < lines.length; i++) {
+      const option = lines[i].trim();
+      if (!option) continue;
+
+      const letter = option.charAt(0);
+
+      html += `
+        <label>
+          <input type="radio" name="q${qNumber}" value="${letter}">
+          ${option}
+        </label><br/>
+      `;
+    }
+
+    html += `<div id="feedback${qNumber}"></div>`;
+    div.innerHTML = html;
+    quizDiv.appendChild(div);
+  });
+
+  document.getElementById("checkBtn").style.display = "inline-block";
+}
+
+function checkAnswers() {
+  let score = 0;
+  const total = Object.keys(answerKey).length;
+
+  for (let q in answerKey) {
+    const selected = document.querySelector(`input[name="q${q}"]:checked`);
+    const feedback = document.getElementById(`feedback${q}`);
+
+    if (!selected) {
+      feedback.innerHTML = `<span class="wrong">ยังไม่ได้เลือก</span>`;
+      continue;
+    }
+
+    if (selected.value === answerKey[q]) {
+      score++;
+      feedback.innerHTML = `<span class="correct">✔ ถูกต้อง</span>`;
+    } else {
+      feedback.innerHTML =
+        `<span class="wrong">✘ ผิด (ตอบที่ถูกคือ ${answerKey[q]})</span>`;
+    }
+  }
+
+  document.getElementById("result").innerText =
+    `คะแนนที่ได้: ${score} / ${total}`;
+}
+
+</script>
+
+</body>
+</html>
